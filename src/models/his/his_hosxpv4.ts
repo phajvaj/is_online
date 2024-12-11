@@ -3,6 +3,7 @@ import * as moment from 'moment';
 
 const maxLimit = 250;
 let hisHospcode = process.env.HOSPCODE;
+const dbType = process.env.HIS_DB_CLIENT;
 const getHospcode = async () => {
     let row = await global.dbHIS('opdconfig').select('hospitalcode').first();
     hisHospcode = row ? row.hospitalcode : process.env.HOSPCODE;
@@ -87,7 +88,7 @@ export class HisHosxpv4Model {
         } else {
             sql.where('r.refer_date', date);
         }
-        return sql.select(db.raw(`concat(r.refer_date, ' ', r.refer_time) AS refer_date`),
+        sql.select(db.raw(`concat(r.refer_date, ' ', r.refer_time) AS refer_date`),
             'r.refer_number AS referid', 'r.refer_hospcode AS hosp_destination',
             'r.hn AS PID', 'r.hn AS hn', 'pt.cid AS CID', 'r.vn', 'r.vn as SEQ',
             'an_stat.an as AN', 'pt.pname AS prename', 'pt.fname AS fname',
@@ -101,14 +102,16 @@ export class HisHosxpv4Model {
             db.raw('CASE WHEN r.hpi then r.hpi else opdscreen.hpi end as PI'),
             db.raw('CASE WHEN refer_vital_sign.pe then refer_vital_sign.pe else r.treatment_text end as PHYSICALEXAM'),
             db.raw('CASE WHEN refer_vital_sign.pre_diagnosis THEN refer_vital_sign.pre_diagnosis ELSE r.pre_diagnosis END as diaglast'),
-            db.raw('IF((SELECT count(an) as cc from an_stat WHERE an =r.vn) = 1,r.vn,null) as an'),
+            db.raw('(SELECT CASE WHEN COUNT(an) > 0 THEN r.vn ELSE NULL END as cc from an_stat WHERE an = r.vn) as an'),
             `r.accept_point as clinic`)
             .whereNotNull('r.vn')
             .where('r.refer_hospcode', '!=', "")
             .whereNotNull('r.refer_hospcode')
-            .where('r.refer_hospcode', '!=', hisHospcode)
-            .groupBy('r.referout_id') // กรณี refer_vital_sign มีหลาย row
-            .orderBy('r.refer_date');
+            .where('r.refer_hospcode', '!=', hisHospcode);
+
+        if(dbType === 'mysql')
+            sql.groupBy('r.referout_id'); // กรณี refer_vital_sign มีหลาย row
+        return sql.orderBy('r.refer_date');
 
         // const sql1 = `
         //     SELECT "${hisHospcode}" AS hospcode,
@@ -219,20 +222,20 @@ export class HisHosxpv4Model {
                 "${hisHospcode}" AS hospcode,
                 pt.cid,
                 pt.hn, pt.hn as pid,
-                IF (p.house_regist_type_id IN (1, 2),'1','2') addresstype,
+                CASE WHEN p.house_regist_type_id IN (1, 2) THEN '1' ELSE '2' END as addresstype,
                 CASE WHEN h.census_id IS NULL THEN '' ELSE h.census_id END AS house_id,
-                IF(p.house_regist_type_id IN (4),'9',h.house_type_id) housetype,
+                CASE WHEN p.house_regist_type_id = 4 THEN '9' ELSE h.house_type_id END as housetype,
                 h.house_condo_roomno roomno,
                 h.house_condo_name condo,
-                IF(p.house_regist_type_id IN (4),pt.addrpart,h.address) houseno,
+                CASE WHEN p.house_regist_type_id = 4 THEN pt.addrpart ELSE h.address END as houseno,
                 '' soisub,
                 '' soimain,
-                IF(p.house_regist_type_id IN (4),pt.road,h.road) road,
-                IF(p.house_regist_type_id IN (4),'',v.village_name)  villaname,
-                IF(p.house_regist_type_id IN (4),pt.moopart,v.village_moo) village,
-                IF(p.house_regist_type_id IN (4),pt.tmbpart,t.tmbpart) tambon,
-                IF(p.house_regist_type_id IN (4),pt.amppart,t.amppart) ampur,
-                IF(p.house_regist_type_id IN (4),pt.chwpart,t.chwpart) changwat,
+                CASE WHEN p.house_regist_type_id = 4 THEN pt.road ELSE h.road END as road,
+                CASE WHEN p.house_regist_type_id = 4 THEN '' ELSE v.village_name END as villaname,
+                CASE WHEN p.house_regist_type_id = 4 THEN pt.moopart ELSE v.village_moo END as village,
+                CASE WHEN p.house_regist_type_id = 4 THEN pt.tmbpart ELSE v.tmbpart END as tambon,
+                CASE WHEN p.house_regist_type_id = 4 THEN pt.amppart ELSE v.amppart END as ampur,
+                CASE WHEN p.house_regist_type_id = 4 THEN pt.chwpart ELSE v.chwpart END as changwat,
                 p.last_update D_Update
             FROM
                 person p
@@ -254,10 +257,7 @@ export class HisHosxpv4Model {
         columnName = columnName === 'seq_id' ? 'os.seq_id' : columnName;
         columnName = columnName === 'hn' ? 'o.hn' : columnName;
         columnName = columnName === 'date_serv' ? 'o.vstdate' : columnName;
-        const sql = `
-            select 
-                "${hisHospcode}" as HOSPCODE,
-                pt.hn as PID, o.hn as HN, pt.CID, os.seq_id, os.vn as SEQ,
+        let vstDate = `
                 if(
                     o.vstdate  is null 
                         or trim(o.vstdate )='' 
@@ -271,13 +271,31 @@ export class HisHosxpv4Model {
                         or o.vsttime like '0000-00-00%',
                     '',
                     time_format(o.vsttime,'%H%i%s')
-                ) as TIME_SERV,
-                if(v.village_moo <>'0' ,'1','2') as LOCATION,
+                ) as TIME_SERV
+        `;
+        let dUpdate = `if(
+                    concat(o.vstdate,' ',o.vsttime) is null 
+                        or trim(concat(o.vstdate,' ',o.vsttime))='' 
+                        or concat(o.vstdate,' ',o.vsttime)  like '0000-00-00%',
+                    '',
+                    date_format(concat(o.vstdate,' ',o.vsttime) ,'%Y-%m-%d %H:%i:%s')
+                ) as D_UPDATE`;
+
+        if(dbType === 'pg') {
+            vstDate = `o.vstdate as DATE_SERV,o.vsttime as TIME_SERV`;
+            dUpdate = `concat(o.vstdate,' ',o.vsttime)::timestamp as D_UPDATE`;
+        }
+
+        const sql = `
+            select 
+                "${hisHospcode}" as HOSPCODE,
+                pt.hn as PID, o.hn as HN, pt.CID, os.seq_id, os.vn as SEQ, ${vstDate},
+                CASE WHEN v.village_moo <> '0' THEN '1' ELSE '2' END as LOCATION,
                 (select case  o.visit_type 
                     when 'i'  then '1' 
                     when 'o' then '2'
                     else '1' end) as INTIME,
-                if(p2.pttype_std_code is null or p2.pttype_std_code ='' ,'9100',p2.pttype_std_code) as INSTYPE,
+                CASE WHEN p2.pttype_std_code is null or p2.pttype_std_code = '' THEN '9100' ELSE p2.pttype_std_code END as INSTYPE,
                 o.hospmain as MAIN,
                 (select case o.pt_subtype 
                     when '7' then '2' 
@@ -288,12 +306,12 @@ export class HisHosxpv4Model {
                 CASE WHEN o.rfrocs IS NULL THEN i.rfrocs ELSE o.rfrocs END as CAUSEOUT,
                 s.waist, s.cc, s.pe, s.pmh as ph, s.hpi as pi,
                 concat('CC:',s.cc,' HPI:',s.hpi,' PMH:',s.pmh) as nurse_note,
-                if(o.pt_subtype in('0','1'),'1','2') as SERVPLACE,
-                if(s.temperature, replace(format(s.temperature,1),',',''), format(0,1))as BTEMP,
-                format(s.bps,0) as SBP,
-                format(s.bpd,0) as DBP,
-                format(s.pulse,0) as PR,
-                format(s.rr,0) as RR,
+                CASE WHEN o.pt_subtype in('0','1') THEN '1' ELSE '2' END as SERVPLACE,
+                ROUND(s.temperature,1) as BTEMP,
+                ROUND(s.bps,0) as SBP,
+                ROUND(s.bpd,0) as DBP,
+                ROUND(s.pulse,0) as PR,
+                ROUND(s.rr,0) as RR,
                 s.o2sat, s.bw as weight, s.height,
                 (select case   
                     when (o.ovstost >='01' and o.ovstost <='14') then '2' 
@@ -303,17 +321,11 @@ export class HisHosxpv4Model {
                 CASE WHEN o.rfrolct IS NULL THEN i.rfrolct ELSE o.rfrolct END as REFEROUTHOSP,
                 o.doctor as dr, doctor.licenseno as provider, 
                 CASE WHEN o.rfrocs IS NULL THEN i.rfrocs ELSE o.rfrocs END as CAUSEOUT,
-                if(vn.inc01 + vn.inc12 , replace(format(vn.inc01 + vn.inc12,2),',',''), format(0,2))as COST,
-                if(vn.item_money , replace(format(vn.item_money,2),',',''), format(0,2))as PRICE,
-                if(vn.paid_money , replace(format(vn.paid_money,2),',',''), format(0,2))as PAYPRICE,
-                if(vn.rcpt_money, replace(format(vn.rcpt_money,2),',',''), format(0,2))as ACTUALPAY,
-                if(
-                    concat(o.vstdate,' ',o.vsttime) is null 
-                        or trim(concat(o.vstdate,' ',o.vsttime))='' 
-                        or concat(o.vstdate,' ',o.vsttime)  like '0000-00-00%',
-                    '',
-                    date_format(concat(o.vstdate,' ',o.vsttime) ,'%Y-%m-%d %H:%i:%s')
-                ) as D_UPDATE,
+                ROUND(vn.inc01 + vn.inc12,2) as COST,
+                ROUND(vn.item_money,2) as PRICE,
+                ROUND(vn.paid_money,2) as PAYPRICE,
+                ROUND(vn.rcpt_money,2) as ACTUALPAY,
+                ${dUpdate},
                 vn.hospsub as hsub
                 
             from  
@@ -432,23 +444,21 @@ export class HisHosxpv4Model {
     }
 
     async getProcedureOpd(db: Knex, visitNo, hospCode = hisHospcode) {
+        let dUpdate = `date_format(concat(o.vstdate,' ',o.vsttime) ,'%Y-%m-%d %H:%i:%s')`;
+        if(dbType === 'pg') {
+            let dUpdate = `concat(o.vstdate,' ',o.vsttime)::timestamp`;
+        }
         const sql = `
             select 
                 ? as hospcode,
                 pt.hn as pid,
                 os.seq_id, os.vn as seq, os.vn,
-                if(o.vstdate is null or trim(o.vstdate)='' or o.vstdate like '0000-00-00%','',date_format(o.vstdate,'%Y-%m-%d')) as date_serv,
+                o.vstdate as date_serv,
                 sp.provis_code as clinic,
                 h3.icd10tm as procedcode,
-                if(h2 .service_price  is not null and trim(h2 .service_price )<>'', replace(format(h2 .service_price ,2),',',''), format(0,2)) as  serviceprice,
+                ROUND(h2.service_price ,2) as serviceprice,
                 h1.health_med_doctor_id as provider,
-                if(
-                    concat(o.vstdate,' ',o.vsttime) is null 
-                        or trim(concat(o.vstdate,' ',o.vsttime))='' 
-                        or concat(o.vstdate,' ',o.vsttime)  like '0000-00-00%',
-                    '',
-                    date_format(concat(o.vstdate,' ',o.vsttime) ,'%Y-%m-%d %H:%i:%s')
-                ) as d_update
+                ${dUpdate} as d_update
             from 
                 health_med_service h1 
                 left outer join health_med_service_operation h2 on h2.health_med_service_id = h1.health_med_service_id 
@@ -473,18 +483,12 @@ export class HisHosxpv4Model {
                 ? as hospcode,
                 pt.hn as pid,
                 os.seq_id, os.vn as seq, os.vn,
-                if(o.vstdate is null or trim(o.vstdate)='' or o.vstdate like '0000-00-00%','',date_format(o.vstdate,'%Y-%m-%d')) as date_serv,
+                o.vstdate as date_serv,
                 sp.provis_code as clinic,
-                if(e.icd10tm is null or e.icd10tm = '',e.icd9cm,e.icd10tm) as procedcode,
-                if(e.price is not null and trim(e.price )<>'', replace(format(e.price ,2),',',''), format(0,2)) as  serviceprice,
+                CASE WHEN e.icd10tm is null or e.icd10tm = '' THEN e.icd9cm ELSE e.icd10tm END as procedcode,
+                ROUND(e.price ,2) as serviceprice,
                 r.doctor as provider,
-                if(
-                    concat(o.vstdate,' ',o.vsttime) is null 
-                        or trim(concat(o.vstdate,' ',o.vsttime))='' 
-                        or concat(o.vstdate,' ',o.vsttime) like '0000-00-00%',
-                    '',
-                    date_format(concat(o.vstdate,' ',o.vsttime) ,'%Y-%m-%d %H:%i:%s')
-                ) as d_update
+                ${dUpdate} as d_update
             from 
                 er_regist_oper r 
                 left outer join er_oper_code e on e.er_oper_code=r.er_oper_code
@@ -506,18 +510,12 @@ export class HisHosxpv4Model {
                 ? as hospcode,
                 pt.hn as pid,
                 os.seq_id, os.vn as seq, os.vn,
-                if(r.vstdate is null or trim(r.vstdate)='' or r.vstdate like '0000-00-00%','',date_format(r.vstdate,'%Y-%m-%d')) as date_serv,
+                r.vstdate as date_serv,
                 sp.provis_code as clinic, 
-                if(e.icd10tm_operation_code is null or e.icd10tm_operation_code= '',e.icd9cm,e.icd10tm_operation_code) as procedcode,
-                if( r.fee  is not null and trim( r.fee )<>'', replace(format( r.fee ,2),',',''), format(0,2)) as  serviceprice,
+                CASE WHEN e.icd10tm_operation_code is null or e.icd10tm_operation_code= '' THEN e.icd9cm ELSE e.icd10tm_operation_code END as procedcode,
+                ROUND(r.fee ,2) as serviceprice,
                 r.doctor as provider,
-                if(
-                    concat(o.vstdate,' ',o.vsttime) is null 
-                        or trim(concat(o.vstdate,' ',o.vsttime))='' 
-                        or concat(o.vstdate,' ',o.vsttime) like '0000-00-00%',
-                    '',
-                    date_format(concat(o.vstdate,' ',o.vsttime),'%Y-%m-%d %H:%i:%s')
-                ) as d_update
+                ${dUpdate} as d_update
             from 
                 dtmain r 
                 left outer join person p on p.patient_hn=r.hn
@@ -539,33 +537,25 @@ export class HisHosxpv4Model {
 
     async getChargeOpd(db: Knex, visitNo, hospCode = hisHospcode) {
         // ifnull(right(concat('00000000', p.person_id), ${hn_len}),pt.hn) as pid2,
+        let dUpdate = `date_format(concat(ovst.vstdate,' ',ovst.vsttime) ,'%Y-%m-%d %H:%i:%s')`;
+        if(dbType === 'pg') {
+            let dUpdate = `concat(ovst.vstdate,' ',ovst.vsttime)::timestamp`;
+        }
         const sql = `
             select
                 ? as hospcode,
                 pt.hn as pid,
                 os.seq_id, os.vn as seq, os.vn,
-                if(
-                    concat(ovst.vstdate) is null 
-                        or trim(concat(ovst.vstdate)) = '' 
-                        or concat(ovst.vstdate) like '0000-00-00%',
-                    '',
-                    date_format(concat(ovst.vstdate),'%Y-%m-%d')
-                ) as date_serv,
-                if (sp.provis_code is null or sp.provis_code ='' ,'00100',sp.provis_code ) as clinic,
+                ovst.vstdate as date_serv,
+                CASE WHEN sp.provis_code is null or sp.provis_code ='' THEN '00100' ELSE sp.provis_code END as clinic,
                 o.income as chargeitem,
-                if(d.charge_list_id is null or d.charge_list_id ='' ,'0000000',right(concat('00000000',d.charge_list_id), 6)) as chargelist,
+                CASE WHEN d.charge_list_id is null or d.charge_list_id ='' THEN '0000000' ELSE right(concat('00000000',d.charge_list_id), 6) END as chargelist,
                 o.qty as quantity,
-                if (p2.pttype_std_code is null or p2.pttype_std_code ='' ,'9100',p2.pttype_std_code) as instype,
-                format(o.cost,2) as cost,
-                format(o.sum_price,2) as price,
+                CASE WHEN p2.pttype_std_code is null or p2.pttype_std_code ='' THEN '9100' ELSE p2.pttype_std_code END as instype,
+                ROUND(o.cost,2) as cost,
+                ROUND(o.sum_price,2) as price,
                 '0.00' as payprice,
-                if(
-                    concat(ovst.vstdate,' ',ovst.cur_dep_time) is null 
-                        or trim(concat(ovst.vstdate,' ',ovst.cur_dep_time))='' 
-                        or concat(ovst.vstdate,' ',ovst.cur_dep_time) like '0000-00-00%',
-                    '',
-                    date_format(concat(ovst.vstdate,' ',ovst.cur_dep_time),'%Y-%m-%d %H:%i:%s')
-                ) as d_update
+                ${dUpdate} as d_update
                 
             from 
                 opitemrece o  
@@ -637,17 +627,24 @@ export class HisHosxpv4Model {
     }
 
     async getDrugOpd(db: Knex, visitNo, hospCode = hisHospcode) {
+        let dUpdate = `
+            if(
+                opi.last_modified  is null 
+                    or trim(opi.last_modified)='' 
+                    or opi.last_modified  like '0000-00-00%',
+                date_format(concat(opi.rxdate,' ',opi.rxtime),'%Y-%m-%d %H:%i:%s'),
+                date_format(opi.last_modified,'%Y-%m-%d %H:%i:%s')
+            )
+        `;
+        if(dbType === 'pg') {
+            let dUpdate = `CASE WHEN opi.last_modified  is null THEN concat(opi.rxdate,' ',opi.rxtime)::timestamp ELSE opi.last_modified END`;
+        }
+
         const sql = `
             SELECT ? as HOSPCODE,
                 pt.hn as PID, pt.cid as CID,
                 os.seq_id, os.vn as SEQ, os.vn,
-                if(
-                    opi.vstdate  is null 
-                        or trim(opi.vstdate)='' 
-                        or opi.vstdate  like '0000-00-00%',
-                    '',
-                    date_format(opi.vstdate ,'%Y-%m-%d')
-                ) as date_serv,
+                opi.vstdate as date_serv,
                 sp.provis_code as clinic,
                 d.did as DID,d.tmt_tp_code as DID_TMT,
                 d.icode as dcode, d.name as dname,
@@ -657,16 +654,10 @@ export class HisHosxpv4Model {
 				concat(d.usage_code, ' ' , d.frequency_code, ' ', d.usage_unit_code, ' ', d.time_code) as usage_code,
 				concat(drugusage.name1, ' ', drugusage.name2 , ' ' , drugusage.name3) as drug_usage,
 				d.therapeutic as caution,
-                format(opi.unitprice,2) as drugprice, 
-                format(d.unitcost,2)  as drugcost, 
+                ROUND(opi.unitprice,2) as drugprice,
+                ROUND(d.unitcost,2)  as drugcost, 
                 opi.doctor as provider,
-                if(
-                    opi.last_modified  is null 
-                        or trim(opi.last_modified)='' 
-                        or opi.last_modified  like '0000-00-00%',
-                    date_format(concat(opi.rxdate,' ',opi.rxtime),'%Y-%m-%d %H:%i:%s'),
-                    date_format(opi.last_modified,'%Y-%m-%d %H:%i:%s')
-                ) as d_update
+                ${dUpdate} as d_update
                 
             FROM
                 opitemrece opi 

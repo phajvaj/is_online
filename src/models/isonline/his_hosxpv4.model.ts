@@ -1,5 +1,6 @@
 import { Knex } from 'knex';
 const dbName = process.env.HIS_DB_NAME;
+const dbType = process.env.HIS_DB_CLIENT;
 const maxLimit = 500;
 
 export class HisHosxpv4Model {
@@ -39,7 +40,7 @@ export class HisHosxpv4Model {
         if (hn) where['opdscreen.hn'] = hn;
         if (date) where['opdscreen.vstdate'] = date;
         if (columnName && searchText) where[columnName] = searchText;
-        return db('opdscreen')
+        const sql = db('opdscreen')
             .leftJoin(`ovst`, 'ovst.vn', 'opdscreen.vn')
             .leftJoin(`patient`, 'patient.hn', 'opdscreen.hn')
             .leftJoin(`er_regist`, 'er_regist.vn', 'ovst.vn')
@@ -75,10 +76,10 @@ export class HisHosxpv4Model {
                 'er_regist.finish_time as disc_date_er',
                 'er_emergency_type.export_code as cause_t'
             )
-            .where(where)
-            .groupBy('ovst.vn')
-            .limit(maxLimit);
-
+            .where(where);
+            if(dbType === 'mysql')
+                sql.groupBy('ovst.vn');
+        return sql.limit(maxLimit);
     }
     getOpdServiceByVN(db: Knex, vn: any) {
         let sql = db('opdscreen');
@@ -125,8 +126,8 @@ export class HisHosxpv4Model {
                 'ipt.ward as wardcode',
                 'referin.refer_hospcode as htohosp'
             )
-            .select(db.raw('if(ovstdiag.diagtype =1,ovstdiag.icd10,null) as diag1'))
-            .select(db.raw('if(ovstdiag.diagtype =2,ovstdiag.icd10,null) as diag2'))
+            .select(db.raw('case when ovstdiag.diagtype = 1 then ovstdiag.icd10 else null end as diag1'))
+            .select(db.raw('case when ovstdiag.diagtype = 2 then ovstdiag.icd10 else null end as diag2'))
             .limit(maxLimit);
     }
 
