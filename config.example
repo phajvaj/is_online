@@ -18,7 +18,7 @@ SSL_CRT=public/ssl/localhost.crt
 
 # valid db client driver: mysql (version เก่า), mysql2 (mysql 5.5+, mariaDB 10+, percona 5.5+), pg, mssql, oracledb
 # valid HIS provider name: 
-#    iHospital, HOSxPv3, HOSxPv4, HOSxPpcu, infod, homc, ssb
+#    iHospital, HOSxPv3, HOSxPv4, HOSxPv4PG, HOSxPpcu, infod, homc, ssb
 #    hospitalos, jhcis, kpstat, md, mkhospital, thiades, 
 #    himpro, nemo, mypcu, emrsoft, haos other
 
