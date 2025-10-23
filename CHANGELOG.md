@@ -1,3 +1,10 @@
+# 3.8.11
+## Feature
+  - เพิ่มการรับ Request จาก Admin
+  - แก้ไข SQL ให้รองรับหลาย vendor
+  - ส่งค่าวันที่ API Server 
+  - เพิ่มการรับ Request จาก admin
+
 # 3.8.10
 ## Feature
   - เพิ่มการ Update Alive
