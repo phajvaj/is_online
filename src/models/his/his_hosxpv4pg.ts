@@ -1689,7 +1689,7 @@ export class HisHosxpv4PgModel {
                     date,
                 );
             });
-        return sql.groupBy("ipt.ward").orderBy("ipt.ward");
+        return sql.groupBy("ipt.ward", "ward.name").orderBy("ipt.ward");
     }
     concurrentIPDByClinic(db: Knex, date: any) {
         let sql = db("ipt")
@@ -1711,7 +1711,7 @@ export class HisHosxpv4PgModel {
                     date,
                 );
             });
-        return sql.groupBy("ipt.spclty").orderBy("ipt.spclty");
+        return sql.groupBy("ipt.spclty", "clinic.name").orderBy("ipt.spclty");
     }
     sumOpdVisitByClinic(db: Knex, date: any) {
         let sql = db("ovst")
@@ -1724,6 +1724,6 @@ export class HisHosxpv4PgModel {
             )
             .count("* as cases")
             .where("ovst.vstdate", date);
-        return sql.groupBy("spclty.nhso_code").orderBy("spclty.nhso_code");
+        return sql.groupBy("ovst.vstdate", "spclty.nhso_code", "spclty.name").orderBy("spclty.nhso_code");
     }
 }
