@@ -3,6 +3,7 @@ import { HisModel } from './../../models/isonline/his.model';
 import { HisEzhospModel } from './../../models/isonline/his_ezhosp.model';
 import { HisHosxpv3Model } from './../../models/isonline/his_hosxpv3.model';
 import { HisHosxpv4Model } from './../../models/isonline/his_hosxpv4.model';
+import { HisHosxpv4pgModel } from './../../models/isonline/his_hosxpv4pg.model';
 import { HisSsbModel } from './../../models/isonline/his_ssb.model';
 import { HisInfodModel } from './../../models/isonline/his_infod.model';
 import { HisHimproModel } from './../../models/isonline/his_himpro.model';
@@ -37,6 +38,9 @@ switch (provider) {
     break;
   case 'hosxpv4':
     hisModel = new HisHosxpv4Model();
+    break;
+  case 'hosxpv4pg':
+    hisModel = new HisHosxpv4pgModel();
     break;
   case 'ssb':
     hisModel = new HisSsbModel();
