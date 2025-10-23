@@ -7,7 +7,7 @@
   "scripts": {
     "start": "npx ts-node ./src/app.ts",
     "watch": "npx nodemon",
-    "build": "rm -rf app && npx tsc"
+    "build": "npx tsc"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
