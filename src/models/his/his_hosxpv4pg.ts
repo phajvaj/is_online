@@ -133,7 +133,7 @@ export class HisHosxpv4PgModel {
             )
             .leftJoin("opdscreen", "r.vn", "opdscreen.vn")
             .leftJoin("doctor", "r.doctor", "doctor.code")
-            .select(db.raw(`"${hisHospcode}" as hospcode`));
+            .select(db.raw(`'${hisHospcode}' as hospcode`));
         if (visitNo) {
             sql.where("r.vn", visitNo);
         } else {
@@ -650,7 +650,7 @@ export class HisHosxpv4PgModel {
                 "o.lab_order_number",
                 "s.lab_order_number",
             )
-            .select(db.raw(`"${hospCode}" as hospcode`))
+            .select(db.raw(`'${hospCode}' as hospcode`))
             .select(
                 "vn as visitno",
                 "lab.hn as hn",
@@ -1455,14 +1455,14 @@ export class HisHosxpv4PgModel {
 
     getClinicalRefer(db, referNo, hospCode = hisHospcode) {
         return db("view_clinical_refer")
-            .select(db.raw(`"${hisHospcode}" as hospcode`))
+            .select(db.raw(`'${hisHospcode}' as hospcode`))
             .where("refer_no", "=", referNo)
             .limit(maxLimit);
     }
 
     getInvestigationRefer(db, referNo, hospCode = hisHospcode) {
         return db("view_investigation_refer")
-            .select(db.raw(`"${hisHospcode}" as hospcode`))
+            .select(db.raw(`'${hisHospcode}' as hospcode`))
             .where("refer_no", "=", referNo)
             .limit(maxLimit);
     }
