@@ -1643,7 +1643,8 @@ export class HisHosxpv4PgModel {
                     END as bed_type
                 `)
             )
-            .where('ward.ward_active', 'Y');
+            .where('ward.ward_active', 'Y')
+            .andWhere('bedno.export_code IS NOT NULL');
         if (bedno) {
             sql = sql.where('bedno.bedno', bedno);
         }
