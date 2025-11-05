@@ -235,5 +235,5 @@ export const erpAdminRequest = async () => {
 }
 
 function getCode9(hcode: string = hospcode) {
-  return `9${hcode.slice(1)}`;
+
 }

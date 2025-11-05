@@ -1616,6 +1616,13 @@ export class HisHosxpv4PgModel {
     }
 
     // MOPH ERP
+    countBedNo(db: Knex) {
+        return db('bedno').count('bedno.bedno as total_bed')
+            .leftJoin('roomno', 'bedno.roomno', 'roomno.roomno')
+            .leftJoin('ward', 'roomno.ward', 'ward.ward')
+            .where('ward.ward_active', 'Y').first();
+    }
+
     getBedNo(db: Knex, bedno: any = null) {
         let sql = db('bedno')
             .leftJoin('roomno', 'bedno.roomno', 'roomno.roomno')
@@ -1636,8 +1643,7 @@ export class HisHosxpv4PgModel {
                     END as bed_type
                 `)
             )
-            .where('ward.ward_active', 'Y')
-            .andWhere('bedno.export_code IS NOT NULL');
+            .where('ward.ward_active', 'Y');
         if (bedno) {
             sql = sql.where('bedno.bedno', bedno);
         }
