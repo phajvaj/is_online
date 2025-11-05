@@ -1620,10 +1620,10 @@ export class HisHosxpv4PgModel {
         return db('bedno').count('bedno.bedno as total_bed')
             .leftJoin('roomno', 'bedno.roomno', 'roomno.roomno')
             .leftJoin('ward', 'roomno.ward', 'ward.ward')
-            .where('ward.ward_active', 'Y').first();
+            .where('ward.ward_active', 'Y').andWhere(db.raw('bedno.export_code IS NOT NULL')).first();
     }
 
-    getBedNo(db: Knex, bedno: any = null) {
+    getBedNo(db: Knex, bedno: any = null, startRow, limitRow: number) {
         let sql = db('bedno')
             .leftJoin('roomno', 'bedno.roomno', 'roomno.roomno')
             .leftJoin('ward', 'roomno.ward', 'ward.ward')
@@ -1648,7 +1648,7 @@ export class HisHosxpv4PgModel {
         if (bedno) {
             sql = sql.where('bedno.bedno', bedno);
         }
-        return sql.orderBy('bedno.bedno');
+        return sql.orderBy('bedno.bedno').limit(startRow, limitRow);
     }
 
     // Report Zone

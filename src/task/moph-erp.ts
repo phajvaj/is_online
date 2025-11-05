@@ -149,6 +149,7 @@ export const sendBedNo = async () => {
         result = await sendingToMoph('/save-bed-no', rows);
         if (result?.status != 200 && result?.statusCode != 200) {
           error = result?.message || result?.status || result?.statusCode || null;
+          console.error(`sendBedNo ${times}: ${error}`);
         }
         sentResult.push({ startRow, limitRow, rows: rows.length, result });
       }
