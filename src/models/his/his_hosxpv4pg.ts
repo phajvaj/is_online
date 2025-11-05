@@ -1623,7 +1623,7 @@ export class HisHosxpv4PgModel {
             .where('ward.ward_active', 'Y').andWhere(db.raw('bedno.export_code IS NOT NULL')).first();
     }
 
-    getBedNo(db: Knex, bedno: any = null, startRow, limitRow: number) {
+    getBedNo(db: Knex, bedno: any = null, startRow: number = 0, limitRow: number = 500) {
         let sql = db('bedno')
             .leftJoin('roomno', 'bedno.roomno', 'roomno.roomno')
             .leftJoin('ward', 'roomno.ward', 'ward.ward')
