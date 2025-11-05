@@ -1648,7 +1648,7 @@ export class HisHosxpv4PgModel {
         if (bedno) {
             sql = sql.where('bedno.bedno', bedno);
         }
-        return sql.orderBy('bedno.bedno').limit(startRow, limitRow);
+        return sql.orderBy('bedno.bedno').limit(startRow).offset(limitRow);
     }
 
     // Report Zone
