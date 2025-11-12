@@ -38,7 +38,7 @@ switch (hisProvider) {
         hisModel = new HisHosxpv3Model();
         break;
     case "hosxpv4":
-        hisModel = new HisHosxpv4Model();
+        hisModel = new HisHosxpv4PgModel();
         break;
     case "hosxpv4pg":
         hisModel = new HisHosxpv4PgModel();
